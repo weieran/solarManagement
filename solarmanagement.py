@@ -114,7 +114,7 @@ class Boiler:
 
     def is_boiler_charged_enough_for_one_day(self):
         # we expect that the boiler is only discharged half of the max usage per day
-        return self.charge_time_of_last_two_days >= Boiler.USAGE_PER_DAY_SEC
+        return self.charge_time_of_last_two_days() >= Boiler.USAGE_PER_DAY_SEC
 
 
 class Energy:
@@ -167,7 +167,7 @@ class Energy:
 
 def is_night():
     now = datetime.datetime.now()
-    return now.hour < 7 or now.hour > 21
+    return now.hour < 7 or now.hour > 20
 
 
 def main() -> int:
