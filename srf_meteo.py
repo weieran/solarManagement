@@ -1,5 +1,5 @@
 import logging
-import time
+import os
 from enum import Enum
 import requests
 import sys
@@ -7,17 +7,17 @@ from datetime import datetime, timedelta
 
 
 class InvalidTokenException(Exception):
-    "Raised when the received access token is invalid "
+    """Raised when the received access token is invalid """
     pass
 
 
 class InvalidGeoLocationException(Exception):
-    "Raised when the received access token is invalid "
+    """Raised when the received access token is invalid """
     pass
 
 
 class InvalidWeatherException(Exception):
-    "Raised when the received access token is invalid "
+    """Raised when the received access token is invalid """
     pass
 
 
@@ -34,13 +34,13 @@ class Weather:
 
     def _get_headers(self):
         if self.last_header_update is None or self.last_header_update + self.TOKEN_VALIDITY_DAY < datetime.now():
-            logging.debug("Updating token, as it is older than 7 days")
+            self.logger.debug("Updating token, as it is older than 7 days")
             self.last_header_update = datetime.now()
-            access_token = self.get_access_token(client_id, client_secret)
+            access_token = self.get_access_token()
             self.headers = {'Authorization': f"Bearer {access_token}"}
         return self.headers
 
-    def get_access_token(self, client_id, client_secret):
+    def get_access_token(self):
         # Define the authentication API endpoint URL and parameters
         url = "https://api.srgssr.ch/oauth/v1/accesstoken"
         params = {
@@ -48,9 +48,9 @@ class Weather:
         }
 
         # Send a POST request to the authentication API endpoint
-        response = requests.post(url, params=params, auth=(client_id, client_secret))
+        response = requests.post(url, params=params, auth=(self.client_id, self.client_secret))
         if not response.ok:
-            logging.error(f"Invalid token, response: {response.status_code}  ")
+            self.logger.error(f"Invalid token, response: {response.status_code}  ")
             raise InvalidTokenException
 
         # Parse the JSON response data
@@ -68,7 +68,7 @@ class Weather:
         response = requests.get(url, params=params, headers=self._get_headers())
 
         if response.status_code != 200:
-            logging.error(f"Invalid geolocation, response: {response.status_code}  ")
+            self.logger.error(f"Invalid geolocation, response: {response.status_code}  ")
             raise InvalidGeoLocationException
 
         # Parse the JSON response data
@@ -87,13 +87,13 @@ class Weather:
         # Define the API endpoint URL and parameters
         url = f"https://api.srgssr.ch/srf-meteo/forecast/{self.geo_location_id}"
         print(url)
-        params = {"type": "hour"}
+        params = {"type": forcast_duration.value}
 
         # Send a GET request to the API endpoint
         response = requests.get(url, params=params, headers=self._get_headers())
 
         if response.status_code != 200:
-            logging.error(f"Invalid weather, response: {response.status_code}  ")
+            self.logger.error(f"Invalid weather, response: {response.status_code}  ")
             raise InvalidWeatherException
 
         # Parse the JSON response data
@@ -107,8 +107,10 @@ class Weather:
 
 
 if __name__ == '__main__':
+    srf_client_id = os.environ.get("SRF_METEO_CLIENT_ID")
+    srf_client_secret = os.environ.get("SRF_METEO_CLIENT_SECRET")
 
-    sachseln = Weather(client_id, client_secret, "Sachseln")
-    sachseln.get_weather_forecast(Weather.ForecastDuration.hour)
-
+    sachseln = Weather(srf_client_id, srf_client_secret, "Sachseln")
+    weather = sachseln.get_weather_forecast(Weather.ForecastDuration.hour)
+    print(weather)
     sys.exit()
