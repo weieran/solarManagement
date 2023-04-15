@@ -94,9 +94,7 @@ class Weather:
         day = "day"
 
     def get_weather_forecast(self, forcast_duration: ForecastDuration):
-        # Define the API endpoint URL and parameters
         url = f"https://api.srgssr.ch/srf-meteo/forecast/{self.geo_location_id}"
-        print(url)
         params = {"type": forcast_duration.value}
 
         # Send a GET request to the API endpoint
@@ -112,8 +110,7 @@ class Weather:
         # Extract the forecast data from the response data
         forecast = data["forecast"]
 
-        # Print the forecast data
-        print(forecast)
+        return forecast
 
 
 if __name__ == '__main__':
@@ -121,6 +118,6 @@ if __name__ == '__main__':
     srf_client_secret = os.environ.get("SRF_METEO_CLIENT_SECRET")
 
     sachseln = Weather(srf_client_id, srf_client_secret, "Sachseln")
-    weather = sachseln.get_weather_forecast(Weather.ForecastDuration.hour)
-    print(weather)
+    forecast = sachseln.get_weather_forecast(Weather.ForecastDuration.hour)
+    print(forecast)
     sys.exit()
