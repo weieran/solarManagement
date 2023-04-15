@@ -1,5 +1,6 @@
 import logging
 import os
+import time
 from enum import Enum
 import requests
 import sys
@@ -22,6 +23,14 @@ class InvalidWeatherException(Exception):
 
 
 class Weather:
+    """ Class to get the weather from SRF Meteo for a specific place using the SRF Meteo API
+        see also https://developer.srgssr.ch/api-catalog/srf-weather#/Forecast/Forecast%20by%20geolocationid
+        In order to use this class, you need to register at https://developer.srgssr.ch/ and create an application.
+        The application will provide you with a client_id and a client_secret.
+        You can then use these values to instantiate the class.
+        The class will automatically update the access token every 7 days.
+
+    """
     TOKEN_VALIDITY_DAY = timedelta(days=7)
 
     def __init__(self, client_id: str, client_secret: str, location: str):
@@ -38,6 +47,7 @@ class Weather:
             self.last_header_update = datetime.now()
             access_token = self.get_access_token()
             self.headers = {'Authorization': f"Bearer {access_token}"}
+            time.sleep(1)  # Wait 1 second to avoid rate limiting
         return self.headers
 
     def get_access_token(self):
