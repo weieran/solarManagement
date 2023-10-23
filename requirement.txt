@@ -1,2 +1,2 @@
 solaredge_modbus
-ShellyPy
+ShellyPy>=0.3.0
