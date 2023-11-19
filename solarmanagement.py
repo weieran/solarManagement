@@ -1,15 +1,18 @@
-import ShellyPy
-import solaredge_modbus
-import pymodbus
-import sys
 import datetime
 import logging
-from enum import Enum
+import sys
 import time
 from decimal import *
+from enum import Enum
 from logging.handlers import RotatingFileHandler
+
+import ShellyPy
+import pymodbus
+import solaredge_modbus
 import yaml
 
+
+# https://www.home-assistant.io/integrations/solaredge_modbus/
 
 class SolarStatus(Enum):
     NOT_CHARGED = 1,
