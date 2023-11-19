@@ -268,6 +268,20 @@ pymodbus = ">=3.0.0"
 pyserial-asyncio = ">=0.6.0"
 
 [[package]]
+name = "srf-weather"
+version = "0.1.1"
+description = "A weather app for SRF"
+optional = false
+python-versions = ">=3.8,<4.0"
+files = [
+    { file = "srf_weather-0.1.1-py3-none-any.whl", hash = "sha256:01de2f6234606506fbae5a113b6f7a1f14dddcd96f6f4f5f1b8470ba4b5bb115" },
+    { file = "srf_weather-0.1.1.tar.gz", hash = "sha256:0b453bcfd0ee2bdfaae1ae1ac99196dd3bb78f7c155c60fdfde0803cca505687" },
+]
+
+[package.dependencies]
+requests = ">=2.28.2,<3.0.0"
+
+[[package]]
 name = "urllib3"
 version = "2.1.0"
 description = "HTTP library with thread-safe connection pooling, file post, and more."
@@ -286,4 +300,4 @@ zstd = ["zstandard (>=0.18.0)"]
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.8"
-content-hash = "ea2a3f5e72962ed58852a1b1fb97703436148eba247704b2b3f0dbeb2a2663ca"
+content-hash = "4df79acea2b50b7e55b16e96031b3fa2f2154debf374cf3d90f75c532b37653e"
