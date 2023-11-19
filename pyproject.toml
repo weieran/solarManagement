@@ -8,7 +8,7 @@ readme = "README.md"
 [tool.poetry.dependencies]
 python = "^3.8"
 pymodbus = "^3.5.4"
-pyyaml = "^5.3.1"
+pyyaml = "^6.0.1"
 ShellyPy = "^0.3.0"
 solaredge_modbus = "^0.7.2"
 
