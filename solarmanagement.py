@@ -11,7 +11,9 @@ import ShellyPy
 import pymodbus
 import solaredge_modbus
 import yaml
+from dateutil.tz import tzlocal
 from srf_weather.weather import Weather
+from suntime import Sun
 
 
 class SolarStatus(Enum):
@@ -176,9 +178,12 @@ class Energy:
 
 
 def is_night():
-    now = datetime.datetime.now()
-    return now.hour < 7 or now.hour > 23
-
+    sun = Sun(48.86718056, 8.23343889)
+    sunset = sun.get_local_sunset_time()
+    sunrise = sun.get_local_sunrise_time()
+    actual_local_time = datetime.datetime.now(tz=tzlocal())
+    is_night = actual_local_time < sunrise or actual_local_time > sunset
+    return is_night
 
 def main() -> int:
     logging_format = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'

@@ -12,6 +12,8 @@ pyyaml = "^6.0.1"
 ShellyPy = "^0.3.0"
 solaredge_modbus = "^0.7.2"
 srf_weather = "^0.1.0"
+suntime = "^1.2.5"
+tzlocal = "^5.2"
 
 [build-system]
 requires = ["poetry-core"]
