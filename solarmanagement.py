@@ -1,14 +1,19 @@
-import ShellyPy
-import solaredge_modbus
-import pymodbus
-import sys
 import datetime
 import logging
-from enum import Enum
+import os
+import sys
 import time
 from decimal import *
+from enum import Enum
 from logging.handlers import RotatingFileHandler
+
+import ShellyPy
+import pymodbus
+import solaredge_modbus
 import yaml
+from dateutil.tz import tzlocal
+from srf_weather.weather import Weather
+from suntime import Sun
 
 
 class SolarStatus(Enum):
@@ -120,14 +125,15 @@ class Boiler:
 class Energy:
     def __init__(self, logger):
         self.log = logger
-        self.inverter = solaredge_modbus.Inverter(host="192.168.2.10", port=1502, timeout=2, retries=3)
+        self.inverter = solaredge_modbus.Inverter(host="192.168.2.10", port=1502, timeout=1, retries=1)
         self.meter = solaredge_modbus.Meter(parent=self.inverter, offset=0)
 
         for attempt in range(10):
             try:
                 self.inverter.connect()
+                self.meter.connect()
             except pymodbus.exceptions.ConnectionException:
-                self.log.error("Could not connect with inverter")
+                self.log.error("Could not connect with inverter or meter, try again in 1s")
                 time.sleep(1)
                 continue
             break
@@ -157,18 +163,27 @@ class Energy:
     def _try_recover(self):
         try:
             self.inverter.disconnect()
+            self.meter.disconnect()
             time.sleep(1)
             self.inverter.connect()
+            self.meter.connect()
         except Exception as e:
             self.log.error(f"failed to recover, reason: {e}")
 
         self.log.debug("recovery done")
 
+    def __del__(self):
+        self.inverter.disconnect()
+        self.meter.disconnect()
+
 
 def is_night():
-    now = datetime.datetime.now()
-    return now.hour < 7 or now.hour > 20
-
+    sun = Sun(48.86718056, 8.23343889)
+    sunset = sun.get_local_sunset_time()
+    sunrise = sun.get_local_sunrise_time()
+    actual_local_time = datetime.datetime.now(tz=tzlocal())
+    is_night = actual_local_time < sunrise or actual_local_time > sunset
+    return is_night
 
 def main() -> int:
     logging_format = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
@@ -188,6 +203,15 @@ def main() -> int:
 
     was_night = is_night()
     logger.info("Start Application")
+    try:
+        sachseln = Weather(os.environ.get("SRF_METEO_CLIENT_ID"),
+                           os.environ.get("SRF_METEO_CLIENT_SECRET"),
+                           "Sachseln")
+        forcast = sachseln.get_weather_forecast(Weather.ForecastDuration.day)
+        sun_h_today, sun_h_tomorrow = Weather.get_hours_of_sun(forcast)
+        logger.info(f"sun hours today: {sun_h_today}, tomorrow: {sun_h_tomorrow}")
+    except Exception as e:
+        logger.error(f"failed to get weather forecast, reason: {e}")
 
     e = Energy(logger)
     boiler = Boiler(logger)
@@ -199,9 +223,19 @@ def main() -> int:
                 if was_night:
                     logger.info("Manager in day mode")
                     boiler.set_new_day()
+                    try:
+                        forcast = sachseln.get_weather_forecast(Weather.ForecastDuration.day)
+                        sun_h_today, sun_h_tomorrow = Weather.get_hours_of_sun(forcast)
+                        logger.info(f"sun hours today: {sun_h_today}, tomorrow: {sun_h_tomorrow}")
+
+                    except Exception as e:
+                        logger.error(f"failed to get weather forecast, reason: {e}")
+
                     was_night = False
 
                 prod, export = e.read()
+                write_data_to_json(prod, export)
+
                 if prod is None or export is None:
                     logger.error("invalid reading, do nothing")
                 else:
@@ -241,6 +275,7 @@ def main() -> int:
     except KeyboardInterrupt:
         logger.info("Stopper by user")
         boiler.disable()
+
         boiler.write_charge_times_to_tmp_file()
         return 0
     except Exception as e:
@@ -248,6 +283,15 @@ def main() -> int:
         boiler.disable()
         boiler.write_charge_times_to_tmp_file()
         return 1
+
+
+# write the produced and consumed energy to solardata.json and rotate it if bigger then 5MB
+def write_data_to_json(production_w, export_w):
+    with open('/tmp/solardata.json', 'a') as f:
+        f.write(f"{datetime.datetime.now().isoformat()}, prod[W]:{production_w}, export[W]:{export_w}\n")
+        f.flush()
+        if os.path.getsize('/tmp/solardata.json') > 10 * 1024 * 1024:
+            os.rename('/tmp/solardata.json', '/tmp/solardata.json.old')
 
 
 if __name__ == '__main__':
