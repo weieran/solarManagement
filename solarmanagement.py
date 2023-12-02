@@ -177,6 +177,11 @@ class Energy:
         self.meter.disconnect()
 
 
+def is_between_1_and_4_am():
+    now = datetime.datetime.now(tz=tzlocal())
+    return now.hour >= 1 and now.hour <= 4
+
+
 def is_night():
     sun = Sun(48.86718056, 8.23343889)
     sunset = sun.get_local_sunset_time()
@@ -184,6 +189,7 @@ def is_night():
     actual_local_time = datetime.datetime.now(tz=tzlocal())
     is_night = actual_local_time < sunrise or actual_local_time > sunset
     return is_night
+
 
 def main() -> int:
     logging_format = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
