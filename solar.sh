@@ -1,3 +1,4 @@
-#!/bin/bash
+c
+
 python3 solarmanagement.py
 	
