@@ -2,7 +2,7 @@
 
 # update ddns server see also https://dynv6.com/zones/3725941/instructions
 # dns password has to be passed as first argument
-
+source /mnt/node/cfg/credentials.sh
 
 ## config
 protocol=dyndns2
