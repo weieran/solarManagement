@@ -10,6 +10,8 @@ If the connection drops, it will try to establish one again until the user exits
 
 import asyncio
 import os
+import sys
+
 from azure.iot.device import (
     IoTHubSession,
     DirectMethodResponse,
@@ -115,5 +117,4 @@ if __name__ == "__main__":
         print("Sent {} messages in total.".format(TOTAL_MESSAGES_SENT))
         print("Received {} messages in total.".format(TOTAL_MESSAGES_RECEIVED))
 
-if __name__ == "__main__":
-    sys.exit(entry())
+
