@@ -96,8 +96,17 @@ class Boiler:
             return True
         return False
 
-    def set_new_day(self):
+    def set_new_day(self, sachseln: Weather):
         self.log.debug("set new day")
+
+        try:
+            forcast = sachseln.get_weather_forecast(Weather.ForecastDuration.day)
+            sun_h_today, sun_h_tomorrow = Weather.get_hours_of_sun(forcast)
+            self.log.info(f"sun hours today: {sun_h_today}, tomorrow: {sun_h_tomorrow}")
+
+        except Exception as e:
+            self.log.error(f"failed to get weather forecast, reason: {e}")
+
         # if we charged more than 3h, we set it to 3h
         self.charge_time_yesterday_sec = min(self.charge_time_today_sec, Boiler.FULL_CHARGE_TIME_SEC)
         self.charge_time_today_sec = 0
@@ -177,6 +186,11 @@ class Energy:
         self.meter.disconnect()
 
 
+def is_between_1_and_4_am():
+    now = datetime.datetime.now(tz=tzlocal())
+    return 1 <= now.hour <= 4
+
+
 def is_night():
     sun = Sun(48.86718056, 8.23343889)
     sunset = sun.get_local_sunset_time()
@@ -184,6 +198,7 @@ def is_night():
     actual_local_time = datetime.datetime.now(tz=tzlocal())
     is_night = actual_local_time < sunrise or actual_local_time > sunset
     return is_night
+
 
 def main() -> int:
     logging_format = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
@@ -200,7 +215,7 @@ def main() -> int:
     pymodus_logger = logging.getLogger('pymodbus.logging')
     pymodus_logger.setLevel(level=logging.INFO)
     pymodus_logger.addHandler(file_handler)
-
+    in_night_time_charging_mode = False
     was_night = is_night()
     logger.info("Start Application")
     try:
@@ -219,19 +234,28 @@ def main() -> int:
     logger.info("Start continuous reading")
     try:
         while True:
+            if is_between_1_and_4_am():
+                if not in_night_time_charging_mode:
+                    in_night_time_charging_mode = True
+
+                    boiler.set_new_day(sachseln)
+                    logger.info("Manager in night time charging mode")
+
+                if boiler.is_boiler_charged_enough_for_one_day():
+                    if boiler.disable():
+                        logger.info(
+                            f"Boiler is charge enough for on more day: {boiler.charge_time_of_last_two_days()}[s]")
+                        logger.info("Disable it")
+                        logger.info("Manager go to sleep")
+                else:
+                    if boiler.enable():
+                        logger.info("Boiler is not charged, enable it")
+
             if not is_night():
                 if was_night:
                     logger.info("Manager in day mode")
-                    boiler.set_new_day()
-                    try:
-                        forcast = sachseln.get_weather_forecast(Weather.ForecastDuration.day)
-                        sun_h_today, sun_h_tomorrow = Weather.get_hours_of_sun(forcast)
-                        logger.info(f"sun hours today: {sun_h_today}, tomorrow: {sun_h_tomorrow}")
-
-                    except Exception as e:
-                        logger.error(f"failed to get weather forecast, reason: {e}")
-
                     was_night = False
+                    in_night_time_charging_mode = False
 
                 prod, export = e.read()
                 write_data_to_json(prod, export)
@@ -260,17 +284,6 @@ def main() -> int:
                 if not was_night:
                     was_night = True
                     logger.info("Manager in night mode")
-
-                if boiler.is_boiler_charged_enough_for_one_day():
-                    if boiler.disable():
-                        logger.info(
-                            f"Boiler is charge enough for on more day: {boiler.charge_time_of_last_two_days()}[s]")
-                        logger.info("Disable it")
-                        logger.info("Manager go to sleep")
-                else:
-                    if boiler.enable():
-                        logger.info("Boiler is not charged, enable it")
-
             time.sleep(2)
     except KeyboardInterrupt:
         logger.info("Stopper by user")
