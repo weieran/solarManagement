@@ -6,6 +6,7 @@ import time
 from decimal import *
 from enum import Enum
 from logging.handlers import RotatingFileHandler
+import subprocess
 
 
 import ShellyPy
@@ -135,7 +136,13 @@ class Boiler:
 class Energy:
     def __init__(self, logger):
         self.log = logger
-        self.inverter = solaredge_modbus.Inverter(host="192.168.2.11", port=1502, timeout=1, retries=1)
+        inverter_mac = "28:b7:7c:1e:66:67"
+        inverter_ip = get_ip_from_mac(inverter_mac)
+        if not inverter_ip:
+            raise RuntimeError(f"Could not find IP for inverter MAC {inverter_mac}. Is it online?")
+        self.log.info(f"Found inverter IP: {inverter_ip} for MAC: {inverter_mac}")
+
+        self.inverter = solaredge_modbus.Inverter(host=inverter_ip, port=1502, timeout=1, retries=1)
         self.meter = solaredge_modbus.Meter(parent=self.inverter, offset=0)
 
         for attempt in range(10):
@@ -311,6 +318,20 @@ def write_data_to_json(production_w, export_w):
         f.flush()
         if os.path.getsize('/tmp/solardata.json') > 10 * 1024 * 1024:
             os.rename('/tmp/solardata.json', '/tmp/solardata.json.old')
+
+
+def get_ip_from_mac(mac_address):
+    """Return the IP address for a given MAC address by parsing the ARP table."""
+    try:
+        # Use 'ip neigh' for modern systems
+        output = subprocess.check_output(['ip', 'neigh'], encoding='utf-8')
+        for line in output.splitlines():
+            parts = line.split()
+            if len(parts) >= 5 and parts[4].lower() == mac_address.lower():
+                return parts[0]
+    except Exception as e:
+        pass
+    return None
 
 
 if __name__ == '__main__':
