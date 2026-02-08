@@ -26,7 +26,7 @@ SOLAREDGE_MAC = "28:b7:7c:1e:66:67"
 SOLAR_JSON_PATH = "/tmp/solar.json"
 SOLAR_LOG_PATH = "/tmp/solar.log"
 SOLAR_DATA_PATH = "/tmp/solardata.json"
-MEASUREMENT_LOG = "/tmp/solar_measurements.log"
+
 
 
 class SolarStatus(Enum):
@@ -332,9 +332,6 @@ def write_data_to_json(production_w, export_w):
         f.flush()
         if os.path.getsize(SOLAR_DATA_PATH) > 10 * 1024 * 1024:
             os.rename(SOLAR_DATA_PATH, SOLAR_DATA_PATH + ".old")
-    # Write to measurement log (append only, no rotation)
-    with open(MEASUREMENT_LOG, 'a') as f:
-        f.write(line)
 
 
 def get_ip_from_mac(mac_address):
