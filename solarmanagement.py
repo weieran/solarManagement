@@ -14,7 +14,6 @@ import pymodbus
 import solaredge_modbus
 import yaml
 from dateutil.tz import tzlocal
-from srf_weather.weather import Weather
 from suntime import Sun
 
 
@@ -109,17 +108,7 @@ class Boiler:
             return True
         return False
 
-    def set_new_day(self, sachseln: Weather):
-        self.log.debug("set new day")
-
-        try:
-            forcast = sachseln.get_weather_forecast(Weather.ForecastDuration.day)
-            sun_h_today, sun_h_tomorrow = Weather.get_hours_of_sun(forcast)
-            self.log.info(f"sun hours today: {sun_h_today}, tomorrow: {sun_h_tomorrow}")
-
-        except Exception as e:
-            self.log.error(f"failed to get weather forecast, reason: {e}")
-
+    def set_new_day(self):
         # if we charged more than 3h, we set it to 3h
         self.charge_time_yesterday_sec = min(self.charge_time_today_sec, Boiler.FULL_CHARGE_TIME_SEC)
         self.charge_time_today_sec = 0
@@ -248,18 +237,7 @@ def main() -> int:
     pymodus_logger = logging.getLogger('pymodbus.logging')
     pymodus_logger.setLevel(level=logging.INFO)
     pymodus_logger.addHandler(file_handler)
-    in_night_time_charging_mode = False
-    was_night = is_night()
     logger.info("Start Application")
-    try:
-        sachseln = Weather(os.environ.get("SRF_METEO_CLIENT_ID"),
-                           os.environ.get("SRF_METEO_CLIENT_SECRET"),
-                           "Sachseln")
-        forcast = sachseln.get_weather_forecast(Weather.ForecastDuration.day)
-        sun_h_today, sun_h_tomorrow = Weather.get_hours_of_sun(forcast)
-        logger.info(f"sun hours today: {sun_h_today}, tomorrow: {sun_h_tomorrow}")
-    except Exception as e:
-        logger.error(f"failed to get weather forecast, reason: {e}")
 
     e = Energy(logger)
     boiler = Boiler(logger)
@@ -267,11 +245,10 @@ def main() -> int:
     logger.info("Start continuous reading")
     try:
         while True:
-
             now = datetime.datetime.now()
             # Call set_new_day() once per night (when date changes)
             if now.date() != last_new_day:
-                boiler.set_new_day(sachseln)
+                boiler.set_new_day()
                 logger.info("New day detected, called boiler.set_new_day()")
                 last_new_day = now.date()
 
@@ -281,21 +258,22 @@ def main() -> int:
                 time.sleep(60)
             else:  # 'good time to measure and charge if it makes sense
                 time.sleep(2)
+                prod, export = e.read()
+                write_data_to_json(prod, export)
+
+                if prod is None or export is None:
+                    prod = 0
+                    export = 0
+                    logger.error("invalid reading, set them to 0")
+                else:
+                    logger.debug(f"prod_w: {prod}: export_w:{export} on-time:{boiler.charge_time_today_sec}")
 
                 if is_between_1_and_4_pm() and not boiler.is_boiler_charged_enough_for_one_day():
                     #if our boiler is not charge enouth to provide heat from the evening and night,
                     # we should charge it during the day, even if we do not have much sun,
                     # because the price are low and we can use all the power we can get.
                     boiler.enable()
-
-                prod, export = e.read()
-                write_data_to_json(prod, export)
-
-                if prod is None or export is None:
-                    logger.error("invalid reading, do nothing")
                 else:
-                    logger.debug(f"prod_w: {prod}: export_w:{export} on-time:{boiler.charge_time_today_sec}")
-
                     # we should make sure that before we enable the boiler
                     # we do not consume too much for something else and have
                     # 3kw Reserve (3kW + a bit of noise)
@@ -305,7 +283,6 @@ def main() -> int:
                     if export >= -1000:  # we import more than 1kW, so we should not charge the boiler
                         if boiler.disable():
                             logger.info(f"Disable: prod_w: {prod}: export_w:{export}")
-
 
     except KeyboardInterrupt:
         logger.info("Stopper by user")
