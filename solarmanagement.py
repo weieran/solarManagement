@@ -18,6 +18,17 @@ from srf_weather.weather import Weather
 from suntime import Sun
 
 
+# === DEVICE NETWORK CONFIGURATION ===
+SHELLY_IP = "192.168.2.78"
+SOLAREDGE_MAC = "28:b7:7c:1e:66:67"
+
+# === FILE PATHS ===
+SOLAR_JSON_PATH = "/tmp/solar.json"
+SOLAR_LOG_PATH = "/tmp/solar.log"
+SOLAR_DATA_PATH = "/tmp/solardata.json"
+MEASUREMENT_LOG = "/tmp/solar_measurements.log"
+
+
 class SolarStatus(Enum):
     NOT_CHARGED = 1,
     ACTIVE_DAY = 2,
@@ -42,9 +53,9 @@ class Boiler:
 
     def __init__(self, logger):
         self.log = logger
-        self.device = ShellyPy.Shelly("192.168.2.78")
+        self.device = ShellyPy.Shelly(SHELLY_IP)
         self.charge_time_today_sec = 0
-        self.json_data = self._read_or_create_yaml_data('/tmp/solar.json',
+        self.json_data = self._read_or_create_yaml_data(SOLAR_JSON_PATH,
                                                         {'version': '1.0',
                                                          'charge_time_yesterday': Boiler.FULL_CHARGE_TIME_SEC,
                                                          'charge_time_today': 0})
@@ -59,7 +70,7 @@ class Boiler:
     def write_charge_times_to_tmp_file(self):
         self.json_data['charge_time_today'] = self.charge_time_today_sec
         self.json_data['charge_time_yesterday'] = self.charge_time_yesterday_sec
-        with open('/tmp/solar.json', 'w') as f:
+        with open(SOLAR_JSON_PATH, 'w') as f:
             yaml.dump(self.json_data, f, default_flow_style=False, allow_unicode=True)
 
     def _read_or_create_yaml_data(self, file_path, initial_data=None):
@@ -136,7 +147,7 @@ class Boiler:
 class Energy:
     def __init__(self, logger):
         self.log = logger
-        inverter_mac = "28:b7:7c:1e:66:67"
+        inverter_mac = SOLAREDGE_MAC
         inverter_ip = get_ip_from_mac(inverter_mac)
         if not inverter_ip:
             raise RuntimeError(f"Could not find IP for inverter MAC {inverter_mac}. Is it online?")
@@ -221,7 +232,7 @@ def main() -> int:
     logger = logging.getLogger("Solar")
     logger.setLevel(level=logging.INFO)
 
-    file_handler = RotatingFileHandler("/tmp/solar.log", mode='a', maxBytes=5 * 1024 * 1024, backupCount=2)
+    file_handler = RotatingFileHandler(SOLAR_LOG_PATH, mode='a', maxBytes=5 * 1024 * 1024, backupCount=2)
     file_handler.setFormatter(formatter)
     logger.addHandler(file_handler)
 
@@ -313,11 +324,17 @@ def main() -> int:
 
 # write the produced and consumed energy to solardata.json and rotate it if bigger then 5MB
 def write_data_to_json(production_w, export_w):
-    with open('/tmp/solardata.json', 'a') as f:
-        f.write(f"{datetime.datetime.now().isoformat()}, prod[W]:{production_w}, export[W]:{export_w}\n")
+    timestamp = datetime.datetime.now().isoformat()
+    line = f"{timestamp}, prod[W]:{production_w}, export[W]:{export_w}\n"
+    # Write to main data file
+    with open(SOLAR_DATA_PATH, 'a') as f:
+        f.write(line)
         f.flush()
-        if os.path.getsize('/tmp/solardata.json') > 10 * 1024 * 1024:
-            os.rename('/tmp/solardata.json', '/tmp/solardata.json.old')
+        if os.path.getsize(SOLAR_DATA_PATH) > 10 * 1024 * 1024:
+            os.rename(SOLAR_DATA_PATH, SOLAR_DATA_PATH + ".old")
+    # Write to measurement log (append only, no rotation)
+    with open(MEASUREMENT_LOG, 'a') as f:
+        f.write(line)
 
 
 def get_ip_from_mac(mac_address):
