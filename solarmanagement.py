@@ -263,10 +263,18 @@ def main() -> int:
 
     e = Energy(logger)
     boiler = Boiler(logger)
-
+    last_new_day = datetime.datetime.now()
     logger.info("Start continuous reading")
     try:
         while True:
+
+            now = datetime.datetime.now()
+            # Call set_new_day() once per night (when date changes)
+            if now.date() != last_new_day:
+                boiler.set_new_day(sachseln)
+                logger.info("New day detected, called boiler.set_new_day()")
+                last_new_day = now.date()
+
             if not is_between_10_am_and_6_pm():
                 #no reason to do anything, just keep as it is and dont measure anything
                 # just sleep for a minute
