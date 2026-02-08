@@ -7,6 +7,7 @@ from decimal import *
 from enum import Enum
 from logging.handlers import RotatingFileHandler
 
+
 import ShellyPy
 import pymodbus
 import solaredge_modbus
@@ -40,7 +41,7 @@ class Boiler:
 
     def __init__(self, logger):
         self.log = logger
-        self.device = ShellyPy.Shelly("shellypro2pm-ec6260822974.alarm")
+        self.device = ShellyPy.Shelly("192.168.2.78")
         self.charge_time_today_sec = 0
         self.json_data = self._read_or_create_yaml_data('/tmp/solar.json',
                                                         {'version': '1.0',
@@ -134,7 +135,7 @@ class Boiler:
 class Energy:
     def __init__(self, logger):
         self.log = logger
-        self.inverter = solaredge_modbus.Inverter(host="192.168.2.10", port=1502, timeout=1, retries=1)
+        self.inverter = solaredge_modbus.Inverter(host="192.168.2.11", port=1502, timeout=1, retries=1)
         self.meter = solaredge_modbus.Meter(parent=self.inverter, offset=0)
 
         for attempt in range(10):
@@ -196,6 +197,11 @@ def is_night():
     sunset = sun.get_local_sunset_time()
     sunrise = sun.get_local_sunrise_time()
     actual_local_time = datetime.datetime.now(tz=tzlocal())
+    # Make sunrise and sunset timezone-aware if they are naive
+    if sunrise.tzinfo is None:
+        sunrise = sunrise.replace(tzinfo=tzlocal())
+    if sunset.tzinfo is None:
+        sunset = sunset.replace(tzinfo=tzlocal())
     is_night = actual_local_time < sunrise or actual_local_time > sunset
     return is_night
 
