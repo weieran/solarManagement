@@ -209,6 +209,15 @@ def is_between_1_and_4_am():
     now = datetime.datetime.now(tz=tzlocal())
     return 1 <= now.hour <= 4
 
+def is_between_1_and_4_pm():
+    now = datetime.datetime.now(tz=tzlocal())
+    return 13 <= now.hour <= 16
+
+def is_between_10_am_and_6_pm():
+    'this is the time where we want to charge the boiler with solar power and where the price are anyway low'
+    now = datetime.datetime.now(tz=tzlocal())
+    return 10 <= now.hour <= 18
+
 
 def is_night():
     sun = Sun(48.86718056, 8.23343889)
@@ -258,28 +267,18 @@ def main() -> int:
     logger.info("Start continuous reading")
     try:
         while True:
-            if is_between_1_and_4_am():
-                if not in_night_time_charging_mode:
-                    in_night_time_charging_mode = True
+            if not is_between_10_am_and_6_pm():
+                #no reason to do anything, just keep as it is and dont measure anything
+                # just sleep for a minute
+                time.sleep(60)
+            else:  # 'good time to measure and charge if it makes sense
+                time.sleep(2)
 
-                    boiler.set_new_day(sachseln)
-                    logger.info("Manager in night time charging mode")
-
-                if boiler.is_boiler_charged_enough_for_one_day():
-                    if boiler.disable():
-                        logger.info(
-                            f"Boiler is charge enough for on more day: {boiler.charge_time_of_last_two_days()}[s]")
-                        logger.info("Disable it")
-                        logger.info("Manager go to sleep")
-                else:
-                    if boiler.enable():
-                        logger.info("Boiler is not charged, enable it")
-
-            if not is_night():
-                if was_night:
-                    logger.info("Manager in day mode")
-                    was_night = False
-                    in_night_time_charging_mode = False
+                if is_between_1_and_4_pm() and not boiler.is_boiler_charged_enough_for_one_day():
+                    #if our boiler is not charge enouth to provide heat from the evening and night,
+                    # we should charge it during the day, even if we do not have much sun,
+                    # because the price are low and we can use all the power we can get.
+                    boiler.enable()
 
                 prod, export = e.read()
                 write_data_to_json(prod, export)
@@ -292,23 +291,14 @@ def main() -> int:
                     # we should make sure that before we enable the boiler
                     # we do not consume too much for something else and have
                     # 3kw Reserve (3kW + a bit of noise)
-                    if not boiler.is_enabled:
-                        enable_export_limit = 3500
-                    else:
-                        enable_export_limit = 500
-
-                    if prod > 3500 and export > enable_export_limit:
+                    if prod > 3000:
                         if boiler.enable():
                             logger.info(f"Enable: prod_w: {prod}: export_w:{export}")
-
-                    if export <= 0:
+                    if export >= -1000:  # we import more than 1kW, so we should not charge the boiler
                         if boiler.disable():
                             logger.info(f"Disable: prod_w: {prod}: export_w:{export}")
-            else:  # is night
-                if not was_night:
-                    was_night = True
-                    logger.info("Manager in night mode")
-            time.sleep(2)
+
+
     except KeyboardInterrupt:
         logger.info("Stopper by user")
         boiler.disable()
