@@ -1,2 +1,0 @@
-solaredge_modbus
-ShellyPy>=0.3.0

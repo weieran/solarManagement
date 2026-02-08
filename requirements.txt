@@ -1,0 +1,8 @@
+solaredge_modbus
+ShellyPy>=0.3.0
+pymodbus
+PyYAML
+python-dateutil
+suntime
+srf_weather
+
